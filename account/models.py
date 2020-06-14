@@ -1,9 +1,13 @@
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, \
+    PermissionsMixin
 
 
 class MyAccountManager(BaseUserManager):
-    def create_user(self, email, first_name, last_name, gender, password=None):
+
+    def create_user(self, email, first_name, last_name, gender, image=None, password=None):
+        # Creates and save a new user
+
         if not email:
             raise ValueError("Users must have an email address")
 
@@ -24,18 +28,22 @@ class MyAccountManager(BaseUserManager):
             first_name=first_name,
             last_name=last_name,
             gender=gender,
+            image=image,
         )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, first_name, last_name, gender, password):
+    def create_superuser(self, email, first_name, last_name, gender, password, image=None):
+        # Creates and save a new superUser
+
         user = self.create_user(
-            email=self.normalize_email(email),
-            first_name=first_name,
-            last_name=last_name,
-            gender=gender,
-            password=password
+            email,
+            first_name,
+            last_name,
+            gender,
+            image,
+            password
         )
 
         user.is_admin = True
@@ -45,8 +53,7 @@ class MyAccountManager(BaseUserManager):
         return user
 
 
-# Create your models here.
-class Account(AbstractBaseUser):
+class Account(AbstractBaseUser, PermissionsMixin):
     # Choices for the gender field.
     GENDER_CHOICES = [('M', 'Male'), ('F', 'Female')]
 
@@ -60,7 +67,7 @@ class Account(AbstractBaseUser):
     is_superuser = models.BooleanField(default=False)
 
     # Our Own Fields
-    email = models.EmailField(verbose_name='email', max_length=60, unique=True)
+    email = models.EmailField(verbose_name='email', max_length=255, unique=True)
     password = models.CharField(max_length=100)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
@@ -80,4 +87,3 @@ class Account(AbstractBaseUser):
 
     def has_module_perms(self, app_label):
         return True
-

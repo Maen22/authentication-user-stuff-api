@@ -58,7 +58,6 @@ class Account(AbstractBaseUser, PermissionsMixin):
     GENDER_CHOICES = [('M', 'Male'), ('F', 'Female')]
 
     # Required Fields by default
-    username = models.CharField(max_length=30, unique=True)
     date_joined = models.DateTimeField(verbose_name='date joined', auto_now_add=True)
     last_login = models.DateTimeField(verbose_name='last login', auto_now=True)
     is_admin = models.BooleanField(default=False)

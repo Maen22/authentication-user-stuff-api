@@ -42,6 +42,8 @@ INSTALLED_APPS = [
     'account',
 ]
 
+OLD_PASSWORD_FIELD_ENABLED = True
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',

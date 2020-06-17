@@ -79,7 +79,7 @@ TEMPLATES = [
     },
 ]
 
-AUTH_USER_MODEL = 'account.Account'
+AUTH_USER_MODEL = 'account.User'
 
 WSGI_APPLICATION = 'Task1.wsgi.application'
 

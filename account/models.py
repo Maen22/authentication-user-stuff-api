@@ -38,7 +38,7 @@ class MyAccountManager(BaseUserManager):
         return user
 
 
-class Account(AbstractUser):
+class User(AbstractUser):
     # Choices for the gender field.
     male = 'M'
     female = 'F'

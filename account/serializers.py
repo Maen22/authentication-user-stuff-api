@@ -1,10 +1,8 @@
-from abc import ABC
-
 from django.contrib.auth import get_user_model, authenticate
-from django.contrib.auth.base_user import AbstractBaseUser
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework import exceptions
+from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -19,11 +17,23 @@ class UserSerializer(serializers.ModelSerializer):
         # Update an account, setting the password correctly and return it
         password = validated_data.pop('password', None)
         user = super().update(instance, validated_data)
-        if password:
-            user.set_password(password)
-            user.save()
-
         return user
+
+
+class CreateUserSerializer(UserSerializer):
+    confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True)
+
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + ['confirm_password']
+
+    def validate(self, attrs):
+        password = attrs.get('password')
+        confirm_password = attrs.get('confirm_password')
+
+        if password != confirm_password:
+            raise serializers.ValidationError(_("Passwords doesn't match, Try again"))
+
+        return attrs
 
 
 class AuthTokenSerializer(serializers.Serializer):
@@ -53,7 +63,6 @@ class AuthTokenSerializer(serializers.Serializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-    model = get_user_model()
 
     old_password = serializers.CharField(max_length=128, allow_blank=False, required=True)
     new_password = serializers.CharField(max_length=128, allow_blank=False, required=True)

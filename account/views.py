@@ -1,8 +1,8 @@
 from rest_framework import generics, authentication, permissions, viewsets
 from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.decorators import action
 from rest_framework.generics import UpdateAPIView
-from rest_framework.settings import api_settings
-from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSerializer
+from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSerializer, CreateUserSerializer
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,7 +15,9 @@ class CreateUserView(generics.CreateAPIView):
     through the users/' url
     """
 
-    serializer_class = UserSerializer
+    serializer_class = CreateUserSerializer
+    permission_classes = ()
+    authentication_classes = ()
 
 
 class AdminViewSet(mixins.CreateModelMixin,
@@ -40,28 +42,32 @@ class AdminViewSet(mixins.CreateModelMixin,
         instance.save()
         return Response(status=status.HTTP_200_OK)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.is_active = False
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class CreateTokenView(ObtainAuthToken):
     serializer_class = AuthTokenSerializer
-    renderer_classes = api_settings.DEFAULT_RENDERER_CLASSES
+    permission_classes = []
+    authentication_classes = []
 
 
-class RetrieveUpdateUserView(generics.RetrieveUpdateAPIView):
+class RetrieveUpdateUserView(viewsets.GenericViewSet):
     """
     A view for the authenticated user to retrieve ('GET') or update ('PUT', 'PATCH') his data
     through the 'users/me/' url
     """
-
-    queryset = User.objects.all
+    queryset = User.objects.all()
     serializer_class = UserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    authentication_classes = [authentication.TokenAuthentication, ]
+    permission_classes = [permissions.IsAuthenticated, ]
+
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        user = request.user
+        serializer = UserSerializer(user)
+        if user is None:
+            return Response(serializer.errors,
+                            status=status.HTTP_404_NOT_FOUND)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class DestroyUserView(generics.DestroyAPIView):
@@ -89,8 +95,8 @@ class ChangePasswordView(UpdateAPIView):
 
     queryset = User.objects.all()
     serializer_class = PasswordChangeSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    authentication_classes = [authentication.TokenAuthentication, ]
+    permission_classes = [permissions.IsAuthenticated, ]
 
     def get_object(self, queryset=None):
         obj = self.request.user

@@ -1,27 +1,23 @@
+from django.conf.urls import url
 from django.urls import path, include
 from .views import CreateUserView, CreateTokenView, ChangePasswordView, RetrieveUpdateUserView, DestroyUserView, \
     AdminViewSet
-from rest_framework.routers import DefaultRouter
+from rest_framework import routers
 
-router = DefaultRouter()
+router = routers.DefaultRouter()
 
-app_name = 'user'
-
-router.register(r'', AdminViewSet, basename='super')
+router.register('users', RetrieveUpdateUserView)
+router.register('admins', AdminViewSet)
 
 urlpatterns = [
-
-    # Registration endpoint ('POST')
-    path('', CreateUserView.as_view(), name='create'),
-
-    # Admin endpoints ('GET', 'PUT', 'PATCH', 'DELETE')
     path('', include(router.urls)),
-
-
+    path('create/', CreateUserView.as_view(), name='create_user'),
     path('login/', CreateTokenView.as_view(), name='token'),
-
-    path('me/', DestroyUserView.as_view(), name='destroy_me'),
-    path('me/', RetrieveUpdateUserView.as_view(), name='retrieve_update_me'),
-    path('change_password/', ChangePasswordView.as_view(), name='password')
+    path('change_password/', ChangePasswordView.as_view(), name='password'),
 
 ]
+
+# path('me/', DestroyUserView.as_view(), name='destroy_me'),
+# path('me/', RetrieveUpdateUserView.as_view(), name='retrieve_update_me'),
+# Registration endpoint ('POST')
+# Admin endpoints ('GET', 'PUT', 'PATCH', 'DELETE')

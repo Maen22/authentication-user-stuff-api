@@ -14,17 +14,24 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {'password': {'write_only': True, 'min_length': 6}}
 
     def update(self, instance, validated_data):
-        # Update an account, setting the password correctly and return it
+        # Update an account, without updating the password
         password = validated_data.pop('password', None)
-        user = super().update(instance, validated_data)
+        user = super().update(instance, **validated_data)
         return user
 
 
+
 class CreateUserSerializer(UserSerializer):
-    confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True)
+
+    confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True, write_only=True)
 
     class Meta(UserSerializer.Meta):
         fields = UserSerializer.Meta.fields + ['confirm_password']
+
+    def create(self, validated_data):
+        validated_data.pop('confirm_password', None)
+        # self.data.pop('confirm_password')
+        return User.objects.create_user(**validated_data)
 
     def validate(self, attrs):
         password = attrs.get('password')
@@ -39,11 +46,13 @@ class CreateUserSerializer(UserSerializer):
 class AuthTokenSerializer(serializers.Serializer):
     # Serializer for the Account authenticated object
 
-    email = serializers.CharField()
+    email = serializers.CharField(label=_("email"))
     password = serializers.CharField(
+        label=_("password"),
         style={'input_type': 'password'},
         trim_whitespace=False
     )
+
 
     def validate(self, attrs):
         email = attrs.get('email')
@@ -63,7 +72,6 @@ class AuthTokenSerializer(serializers.Serializer):
 
 
 class PasswordChangeSerializer(serializers.Serializer):
-
     old_password = serializers.CharField(max_length=128, allow_blank=False, required=True)
     new_password = serializers.CharField(max_length=128, allow_blank=False, required=True)
     confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True)

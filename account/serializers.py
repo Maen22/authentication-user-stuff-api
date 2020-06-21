@@ -1,50 +1,21 @@
 from django.contrib.auth import get_user_model, authenticate
-from django.core.validators import EmailValidator
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers, status
+from rest_framework import serializers
 from rest_framework import exceptions
-from rest_framework.response import Response
-
 from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    # Serializer for the Account object
-
     class Meta:
         model = get_user_model()
         fields = ['id', 'email', 'password', 'first_name', 'last_name', 'gender', 'image']
         extra_kwargs = {'password': {'write_only': True, 'min_length': 6}}
 
-    # def update(self, instance, validated_data):
-    #     # Update an account, without updating the password
-    #     password = validated_data.pop('password', None)
-    #     user = super().update(instance, **validated_data)
-    #     return user
 
-
-class UpdateUserSerializer(UserSerializer):
-    class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields[1:2] + UserSerializer.Meta.fields[3:]
-        extra_kwargs = {
-            'email': {'validators': [EmailValidator, ]},
-        }
-
-    def update(self, instance, validated_data):
-        # Update an account, without updating the password
-        user = super().update(instance, validated_data)
-        return user
-
-
-class PartialUpdateUserSerializer(UserSerializer):
-    class Meta(UserSerializer.Meta):
-        fields = []
-        extra_kwargs = {}
-
-    def update(self, instance, validated_data):
-        # Update an account, without updating the password
-        user = super().update(instance, validated_data)
-        return user
+class UpdateUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ['password']
 
 
 class CreateUserSerializer(UserSerializer):
@@ -69,8 +40,6 @@ class CreateUserSerializer(UserSerializer):
 
 
 class AuthTokenSerializer(serializers.Serializer):
-    # Serializer for the Account authenticated object
-
     email = serializers.CharField(label=_("email"))
     password = serializers.CharField(
         label=_("password"),

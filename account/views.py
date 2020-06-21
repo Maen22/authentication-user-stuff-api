@@ -1,86 +1,88 @@
-from django.core.handlers import exception
-from rest_framework import generics, authentication, permissions, viewsets
-from rest_framework.authtoken.views import ObtainAuthToken
+from django.shortcuts import get_object_or_404
+from rest_framework import authentication, permissions, mixins
+from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
-from rest_framework.generics import UpdateAPIView
+from rest_framework.viewsets import GenericViewSet
 from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSerializer, CreateUserSerializer, \
-    UpdateUserSerializer, PartialUpdateUserSerializer
+    UpdateUserSerializer
 from .models import User
 from rest_framework.response import Response
-from rest_framework import status, exceptions
-from rest_framework import mixins
+from rest_framework import status
 
 
-class CreateUserView(generics.CreateAPIView):
+class UserRelatedView(mixins.RetrieveModelMixin,
+                      mixins.UpdateModelMixin,
+                      mixins.DestroyModelMixin,
+                      mixins.ListModelMixin,
+                      GenericViewSet):
     """
-    A view for any API caller to create a new account ('POST')
-    through the users/' url
-    """
-
-    serializer_class = CreateUserSerializer
-    permission_classes = ()
-    authentication_classes = ()
-
-
-class AdminViewSet(mixins.CreateModelMixin,
-                   mixins.ListModelMixin,
-                   mixins.RetrieveModelMixin,
-                   mixins.UpdateModelMixin,
-                   mixins.DestroyModelMixin,
-                   viewsets.GenericViewSet):
-    """
-    A viewset for the super user to retrieve ('GET') or update ('PUT', 'PATCH') or soft delete ('DELETE') any user data
-    through the users/<id>(optional)/' url
-    """
-
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
-    permission_classes = (permissions.IsAdminUser,)
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.setPassword(request.data['new_password'])
-        instance.save()
-        return Response(status=status.HTTP_200_OK)
-
-
-class CreateTokenView(ObtainAuthToken):
-    serializer_class = AuthTokenSerializer
-    permission_classes = []
-    authentication_classes = []
-
-
-class RetrieveUpdateUserView(viewsets.ModelViewSet):
-    """
-    A view for the authenticated user to retrieve ('GET') or update ('PUT', 'PATCH') his data
-    through the 'users/me/' url
+    A view for the superusers and authenticated users to retrieve ('GET') or update ('PUT', 'PATCH') or soft delete (
+    'DELETE') the users data through the users/ url for superusers, and 'users/me/' url for the authenticated users
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
     authentication_classes = [authentication.TokenAuthentication, ]
-    permission_classes = [permissions.IsAuthenticated, ]
+    permission_classes = [permissions.IsAdminUser]
 
-    def get_queryset(self):
-        return User.objects.filter(pk=self.request.user.pk).first()
+    def update(self, request, *args, **kwargs):
+        instance = get_object_or_404()
+        serializer = UpdateUserSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.update(instance=instance, validated_data=serializer.validated_data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response('Wrong input, Please provide all the required fields',
+                        status=status.HTTP_400_BAD_REQUEST)
 
-    def get_object(self):
-        return User.objects.filter(pk=self.request.user.pk).first()
+    def partial_update(self, request, *args, **kwargs):
+        instance = get_object_or_404()
+        serializer = UpdateUserSerializer(data=request.data, partial=True)
+        if serializer.is_valid(raise_exception=True):
+            serializer.update(instance=instance, validated_data=serializer.validated_data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response('Wrong input, Please provide all the required fields',
+                        status=status.HTTP_400_BAD_REQUEST)
 
-    def list(self, request, *args, **kwargs):
-        return Response('unauthorized', status=status.HTTP_401_UNAUTHORIZED)
+    def destroy(self, request, *args, **kwargs):
+        instance = get_object_or_404()
+        instance.is_active = False
+        instance.save()
+        return Response('Object deactivated successfully', status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=['GET', 'PUT', 'PATCH', 'DELETE'])
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def create_user(self, request):
+        serializer = CreateUserSerializer(data=request.data)
+        if serializer.is_valid(raise_exception=True):
+            serializer.create(validated_data=serializer.validated_data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
+    def login(self, request):
+        serializer = AuthTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({'token': token.key, 'user_id': user.id})
+
+    @action(detail=False, methods=['put'], permission_classes=[permissions.IsAuthenticated])
+    def change_password(self, request):
+        instance = request.user
+        serializer = PasswordChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        instance.set_password(serializer.data.get('new_password'))
+        instance.save()
+        response = {
+            'status': 'success',
+            'code': status.HTTP_200_OK,
+            'message': 'Password updated successfully',
+            'data': []
+        }
+
+        return Response(response)
+
+    @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
 
-        user = self.get_object()
-
-        user_fields = UpdateUserSerializer.Meta.fields
-        user_fields.sort()
-        request_fields = list(request.data.keys())
-        request_fields.sort()
-
-        password = request.data.get('password')
+        user = self.request.user
 
         if request.method == 'GET':
             serializer = UserSerializer(user)
@@ -90,94 +92,23 @@ class RetrieveUpdateUserView(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         if request.method == 'PUT':
-            if password or password is None:
-                return Response("User can not change password through this endpoint, Visit /change_password/ to "
-                                "change password",
-                                status=status.HTTP_400_BAD_REQUEST)
-            if user_fields == request_fields:
-                serializer = UpdateUserSerializer(data=request.data)
-                if serializer.is_valid():
-                    serializer.update(instance=user, validated_data=request.data)
-                    return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response('Wrong input, Please provide all the required fields {}'.format(user_fields), status=status.HTTP_400_BAD_REQUEST)
+            serializer = UpdateUserSerializer(data=request.data)
+            if serializer.is_valid(raise_exception=True):
+                serializer.update(instance=user, validated_data=serializer.validated_data)
+                return Response(serializer.validated_data, status=status.HTTP_200_OK)
+            return Response('Wrong input, Please provide all the required fields {}',
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if request.method == 'PATCH':
-            if password or password is None:
-                return Response("User can not change password through this endpoint, Visit /change_password/ to "
-                                "change password",
-                                status=status.HTTP_400_BAD_REQUEST)
-            # serializer = PartialUpdateUserSerializer(data=request.data)
-            # if serializer.is_valid():
-            self.partial_update(request=request)
-            return Response(request.data, status=status.HTTP_200_OK)
-            # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer = UpdateUserSerializer(data=request.data, partial=True)
+            if serializer.is_valid(raise_exception=True):
+                serializer.update(instance=user, validated_data=serializer.validated_data)
+                return Response(serializer.validated_data, status=status.HTTP_200_OK)
+            return Response('Wrong input, Please provide all the required fields {}',
+                            status=status.HTTP_400_BAD_REQUEST)
 
         if request.method == 'DELETE':
             if user:
                 user.is_active = False
                 user.save()
                 return Response('User deactivated', status=status.HTTP_204_NO_CONTENT)
-
-
-class UpdateUser(generics.UpdateAPIView):
-    serializer_class = UserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def get_queryset(self):
-        return User.objects.get(pk=self.request.user.pk)
-
-    def put(self, request, *args, **kwargs):
-        if request.data.get('password', None) is not None:
-            raise exceptions.ValidationError('no password allowed here ')
-        super().put(request)
-
-
-class DestroyUserView(generics.DestroyAPIView):
-    """
-    A view for the authenticated user to soft delete ('DELETE) his account (is_active = False)
-    through the 'users/delete/me/' url
-    """
-
-    serializer_class = UserSerializer
-    authentication_classes = (authentication.TokenAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = request.user
-        instance.is_active = False
-        instance.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ChangePasswordView(UpdateAPIView):
-    """
-    A view for the authenticated user to update his password ('PUT')
-    through the 'users/change-password/' url
-    """
-
-    queryset = User.objects.all()
-    serializer_class = PasswordChangeSerializer
-    authentication_classes = [authentication.TokenAuthentication, ]
-    permission_classes = [permissions.IsAuthenticated, ]
-
-    def get_object(self, queryset=None):
-        obj = self.request.user
-        return obj
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(data=request.data)
-        if serializer.is_valid():
-            instance.set_password(serializer.data.get('new_password'))
-            instance.save()
-            response = {
-                'status': 'success',
-                'code': status.HTTP_200_OK,
-                'message': 'Password updated successfully',
-                'data': []
-            }
-
-            return Response(response)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

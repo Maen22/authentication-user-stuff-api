@@ -1,7 +1,10 @@
 from django.contrib.auth import get_user_model, authenticate
+from django.core.validators import EmailValidator
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework import exceptions
+from rest_framework.response import Response
+
 from .models import User
 
 
@@ -10,19 +13,41 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = get_user_model()
-        fields = ['email', 'password', 'first_name', 'last_name', 'gender', 'image']
+        fields = ['id', 'email', 'password', 'first_name', 'last_name', 'gender', 'image']
         extra_kwargs = {'password': {'write_only': True, 'min_length': 6}}
+
+    # def update(self, instance, validated_data):
+    #     # Update an account, without updating the password
+    #     password = validated_data.pop('password', None)
+    #     user = super().update(instance, **validated_data)
+    #     return user
+
+
+class UpdateUserSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields[1:2] + UserSerializer.Meta.fields[3:]
+        extra_kwargs = {
+            'email': {'validators': [EmailValidator, ]},
+        }
 
     def update(self, instance, validated_data):
         # Update an account, without updating the password
-        password = validated_data.pop('password', None)
-        user = super().update(instance, **validated_data)
+        user = super().update(instance, validated_data)
         return user
 
 
+class PartialUpdateUserSerializer(UserSerializer):
+    class Meta(UserSerializer.Meta):
+        fields = []
+        extra_kwargs = {}
+
+    def update(self, instance, validated_data):
+        # Update an account, without updating the password
+        user = super().update(instance, validated_data)
+        return user
+
 
 class CreateUserSerializer(UserSerializer):
-
     confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True, write_only=True)
 
     class Meta(UserSerializer.Meta):
@@ -52,7 +77,6 @@ class AuthTokenSerializer(serializers.Serializer):
         style={'input_type': 'password'},
         trim_whitespace=False
     )
-
 
     def validate(self, attrs):
         email = attrs.get('email')

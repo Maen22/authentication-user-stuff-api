@@ -81,3 +81,7 @@ class PasswordChangeSerializer(serializers.Serializer):
             raise serializers.ValidationError(_("Passwords doesn't match"))
 
         return attrs
+
+
+class PasswordChangeOutputSerializer:
+    pass

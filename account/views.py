@@ -4,7 +4,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSerializer, CreateUserSerializer, \
-    UpdateUserSerializer
+    UpdateUserSerializer, PasswordChangeOutputSerializer
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
@@ -25,7 +25,7 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     permission_classes = [permissions.IsAdminUser]
 
     def update(self, request, *args, **kwargs):
-        instance = get_object_or_404()
+        instance = self.get_object()
         serializer = UpdateUserSerializer(data=request.data)
         if serializer.is_valid(raise_exception=True):
             serializer.update(instance=instance, validated_data=serializer.validated_data)
@@ -34,7 +34,7 @@ class UserRelatedView(mixins.RetrieveModelMixin,
                         status=status.HTTP_400_BAD_REQUEST)
 
     def partial_update(self, request, *args, **kwargs):
-        instance = get_object_or_404()
+        instance = self.get_object()
         serializer = UpdateUserSerializer(data=request.data, partial=True)
         if serializer.is_valid(raise_exception=True):
             serializer.update(instance=instance, validated_data=serializer.validated_data)
@@ -43,7 +43,7 @@ class UserRelatedView(mixins.RetrieveModelMixin,
                         status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):
-        instance = get_object_or_404()
+        instance = self.get_object()
         instance.is_active = False
         instance.save()
         return Response('Object deactivated successfully', status=status.HTTP_204_NO_CONTENT)
@@ -51,9 +51,9 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def create_user(self, request):
         serializer = CreateUserSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.create(validated_data=serializer.validated_data)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        serializer.is_valid(raise_exception=True)
+        serializer.create(validated_data=serializer.validated_data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
@@ -70,15 +70,9 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         serializer.is_valid(raise_exception=True)
         instance.set_password(serializer.data.get('new_password'))
         instance.save()
-        response = {
-            'status': 'success',
-            'code': status.HTTP_200_OK,
-            'message': 'Password updated successfully',
-            'data': []
-        }
+        return Response(PasswordChangeOutputSerializer.data)
 
-        return Response(response)
-
+    # url_path for customizing all the methods
     @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
 
@@ -93,22 +87,17 @@ class UserRelatedView(mixins.RetrieveModelMixin,
 
         if request.method == 'PUT':
             serializer = UpdateUserSerializer(data=request.data)
-            if serializer.is_valid(raise_exception=True):
-                serializer.update(instance=user, validated_data=serializer.validated_data)
-                return Response(serializer.validated_data, status=status.HTTP_200_OK)
-            return Response('Wrong input, Please provide all the required fields {}',
-                            status=status.HTTP_400_BAD_REQUEST)
+            serializer.is_valid(raise_exception=True)
+            serializer.update(instance=user, validated_data=serializer.validated_data)
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
         if request.method == 'PATCH':
             serializer = UpdateUserSerializer(data=request.data, partial=True)
-            if serializer.is_valid(raise_exception=True):
-                serializer.update(instance=user, validated_data=serializer.validated_data)
-                return Response(serializer.validated_data, status=status.HTTP_200_OK)
-            return Response('Wrong input, Please provide all the required fields {}',
-                            status=status.HTTP_400_BAD_REQUEST)
+            serializer.is_valid(raise_exception=True)
+            serializer.update(instance=user, validated_data=serializer.validated_data)
+            return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
         if request.method == 'DELETE':
-            if user:
-                user.is_active = False
-                user.save()
-                return Response('User deactivated', status=status.HTTP_204_NO_CONTENT)
+            user.is_active = False
+            user.save()
+            return Response('User deactivated', status=status.HTTP_204_NO_CONTENT)

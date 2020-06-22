@@ -1,106 +1,46 @@
-from django.test import TestCase, Client
-from django.contrib.auth import get_user_model
-from django.urls import reverse, reverse_lazy
-
-'''
-    User Model Test Cases
-'''
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+from .models import User
 
 
-class ModelTests(TestCase):
-
-    def test_create_user_with_email_successful(self):
-        # Test creating a new user with an email -> is successful
-
-        email = 'm3n@gmail.com'
-        password = 'pass123'
-        first_name = 'Maen'
-        last_name = 'Ibreigheith'
-        gender = 'M'
-        user = get_user_model().objects.create_user(
-            email=email,
-            first_name=first_name,
-            last_name=last_name,
-            gender=gender,
-            password=password
-        )
-
-        self.assertEqual(user.email, email)
-        self.assertTrue(user.check_password(password))
-
-    def test_new_user_email_normalized(self):
-        # Test the email for a new user is normalized
-
-        email = 'm3n@GMAIL.Com'
-        user = get_user_model().objects.create_user(
-            email=email,
-            first_name='Maen',
-            last_name='Ibreigheith',
-            gender='M',
-            password='pass123'
-        )
-
-        self.assertEqual(user.email, email.lower())
-
-    def test_user_invalid_email(self):
-        # Test creating user with no email raises error
-
-        with self.assertRaises(ValueError):
-            get_user_model().objects.create_user(
-                email=None,
-                first_name='Maen',
-                last_name='Ibreigheith',
-                gender='M',
-                password='pass123'
-            )
-
-    def test_create_new_super_user(self):
-        # Test creating a new super user
-        user = get_user_model().objects.create_superuser(
-            email='m3n@hotmail.com',
-            first_name='Maen',
-            last_name='Ibreigheith',
-            gender='M',
-            password='pass123'
-        )
-
-        self.assertTrue(user.is_superuser)
-        self.assertTrue(user.is_staff)
-
-
-'''
-     Admin Site Test Cases
-'''
-
-
-class AdminSiteTests(TestCase):
-    # This function will run before any Admin Site Test run (setUp)
+class UserTests(APITestCase):
 
     def setUp(self):
-        self.client = Client()
-        self.admin_user = get_user_model().objects.create_superuser(
-            email='m3n@hotmail.com',
-            first_name='Maen',
-            last_name='Ibreigheith',
-            gender='M',
-            password='pass123'
-        )
-        self.client.force_login(self.admin_user)
+        self.user_data = {'email': 'user1@test.com',
+                          'first_name': 'fuser',
+                          'last_name': 'luser',
+                          'gender': 'F',
+                          'password': 'abcd_1234'}
 
-        self.user = get_user_model().objects.create_user(
-            email='seif@gmail.com',
-            first_name='Seif',
-            last_name='Obied',
-            gender='M',
-            password='pass123'
-        )
+        self.admin_data = {'email': 'admin1@test.com',
+                           'first_name': 'fadmin',
+                           'last_name': 'ladmin',
+                           'gender': 'M',
+                           'password': 'abcd_1234'}
 
-    def test_users_listed(self):
-        # Test that users are listed on user page
+        self.user = User.objects.create_user(**self.user_data)
+        self.user = User.objects.create_superuser(**self.admin_data)
 
-        url = reverse('admin:account_account_changelist')
-        res = self.client.get(url)
+        self.create_user_url = reverse('api-create-user')
+        self.login_url = reverse('api-login')
+        self.change_password_url = reverse('api-change-password')
+        self.me_url = reverse('api-me')
 
-        self.assertContains(res, self.user.email)
-        self.assertContains(res, self.user.first_name)
-        self.assertContains(res, self.user.gender)
+    def test_create_user(self):
+        data = self.user_data
+        data['email'] = ''
+        data['confirm_password'] = 'abcd_1234'
+        response = self.client.post(self.create_user_url, data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(User.objects.count(), 3)
+        self.assertEqual(User.objects.get(id=2).first_name, 'fadmin')
+
+    def test_login(self):
+        login_data = {'email': 'user1@test.com',
+                      'password': 'abcd_1234'}
+
+        response = self.client.post(self.login_url, login_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

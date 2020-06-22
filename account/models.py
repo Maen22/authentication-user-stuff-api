@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 
 class MyAccountManager(BaseUserManager):
 
-    def create_user(self, email, first_name, last_name, gender, image=None, password=None):
+    def create_user(self, email, first_name, last_name, gender, password=None, image=None):
         # Creates and save a new user
 
         user = self.model(
@@ -45,6 +45,7 @@ class User(AbstractUser):
     GENDER_CHOICES = [(male, 'Male'), (female, 'Female')]
 
     username = None
+    last_login = None
     email = models.EmailField(verbose_name='email', max_length=255, unique=True, null=False)
     password = models.CharField(_('password'), max_length=128, null=False)
     first_name = models.CharField(max_length=50, null=False)

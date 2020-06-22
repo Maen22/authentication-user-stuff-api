@@ -8,6 +8,7 @@ from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSeri
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
+from django.contrib.auth import views
 
 
 class UserRelatedView(mixins.RetrieveModelMixin,
@@ -21,7 +22,6 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     """
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    authentication_classes = [authentication.TokenAuthentication, ]
     permission_classes = [permissions.IsAdminUser]
 
     def update(self, request, *args, **kwargs):
@@ -70,7 +70,7 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         serializer.is_valid(raise_exception=True)
         instance.set_password(serializer.data.get('new_password'))
         instance.save()
-        return Response(PasswordChangeOutputSerializer.data)
+        return Response('password changed successfully', status=status.HTTP_200_OK)
 
     # url_path for customizing all the methods
     @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[permissions.IsAuthenticated])

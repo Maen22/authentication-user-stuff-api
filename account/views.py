@@ -1,4 +1,3 @@
-
 from rest_framework import authentication, permissions, mixins
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
@@ -8,7 +7,7 @@ from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSeri
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
-
+import json
 
 
 class UserRelatedView(mixins.RetrieveModelMixin,
@@ -37,7 +36,6 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         serializer.is_valid(raise_exception=True)
         serializer.update(instance=instance, validated_data=serializer.validated_data)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
 
     def destroy(self, request, *args, **kwargs):
         instance = request.user
@@ -74,13 +72,10 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
 
-        user = self.request.user
+        user = request.user
 
         if request.method == 'GET':
             serializer = UserSerializer(user)
-            if user is None:
-                return Response(UserSerializer.errors,
-                                status=status.HTTP_404_NOT_FOUND)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         if request.method == 'PUT':
@@ -98,4 +93,8 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         if request.method == 'DELETE':
             user.is_active = False
             user.save()
-            return Response('User deactivated', status=status.HTTP_204_NO_CONTENT)
+            res = {
+                'detail': 'User deactivated'
+            }
+            # response = json.dumps(res)
+            return Response(res, status=status.HTTP_204_NO_CONTENT)

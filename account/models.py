@@ -45,7 +45,6 @@ class User(AbstractUser):
     GENDER_CHOICES = [(male, 'Male'), (female, 'Female')]
 
     username = None
-    last_login = None
     email = models.EmailField(verbose_name='email', max_length=255, unique=True, null=False)
     password = models.CharField(_('password'), max_length=128, null=False)
     first_name = models.CharField(max_length=50, null=False)

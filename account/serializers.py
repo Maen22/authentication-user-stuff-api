@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model, authenticate, password_validation
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework import exceptions
@@ -9,7 +9,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = get_user_model()
         fields = ['id', 'email', 'password', 'first_name', 'last_name', 'gender', 'image']
-        extra_kwargs = {'password': {'write_only': True, 'min_length': 6}}
+        extra_kwargs = {'password': {'write_only': True}}
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
@@ -32,6 +32,12 @@ class CreateUserSerializer(UserSerializer):
     def validate(self, attrs):
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
+
+        try:
+            password_validation.validate_password(password=password)
+
+        except exceptions.ValidationError as e:
+            raise e
 
         if password != confirm_password:
             raise serializers.ValidationError(_("Passwords doesn't match, Try again"))
@@ -76,6 +82,12 @@ class PasswordChangeSerializer(serializers.Serializer):
         user = self.context.get('request').user
         if not user.check_password(old_password):
             raise serializers.ValidationError(_("Old password doesn't match"))
+
+        try:
+            password_validation.validate_password(password=new_password, user=user)
+
+        except exceptions.ValidationError as e:
+            raise e
 
         if not new_password == confirm_password:
             raise serializers.ValidationError(_("Passwords doesn't match"))

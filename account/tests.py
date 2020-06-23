@@ -3,6 +3,7 @@ from rest_framework import status, exceptions
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 from .models import User
+import ast
 
 
 class UserTests(APITestCase):
@@ -26,9 +27,10 @@ class UserTests(APITestCase):
                            'password': 'abcd_1234',
                            'image': None}
 
-        self.user = User.objects.create_user(email='user1@test.com', first_name='fuser', last_name='luser', gender='M', password='abcd_1234')
+        self.user = User.objects.create_user(email='user1@test.com', first_name='fuser', last_name='luser', gender='M',
+                                             password='abcd_1234')
         self.admin = User.objects.create_superuser(**self.admin_data)
-        # self.token = Token.objects.create(user=self.user)
+        self.token = Token.objects.create(user=self.user)
 
         # self.client.force_login(self.admin)
 
@@ -145,4 +147,66 @@ class UserTests(APITestCase):
         response = self.client.put(self.change_password_url, data)
         self.assertEqual(response.status_code, 200)
 
+    """
+    ---- users/me test cases ----
+    """
 
+    def test_get_user_detail(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.me_url)
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_user_detail_with_unauthenticated_user(self):
+        response = self.client.get(self.me_url)
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_user_detail_check_response_content(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.me_url)
+        content_str = response.content.decode("UTF-8")
+        # content = ast.literal_eval(content_str)
+        # print(type(content))
+
+        self.assertEqual(content_str[17:31], self.user.email)
+
+    def test_update_user_details(self):
+        data = {'email': 'user123@test.com',
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.user)
+        response = self.client.put(self.me_url, data=data)
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_user_details_null_email(self):
+        data = {'email': None,
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.user)
+        response = self.client.put(self.me_url, data=data)
+
+        self.assertRaises(exceptions.ValidationError)
+
+    def test_update_user_details_with_password(self):
+        data = {'email': None,
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'password': 'maen_12345',
+                'image': None}
+
+        self.client.force_login(self.user)
+        response = self.client.put(self.me_url, data=data)
+
+        # The password should not be affected by ('PUT', or 'PATCH')
+        self.assertNotEqual(self.user.check_password(data['password']), True)

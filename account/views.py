@@ -1,14 +1,14 @@
-from django.shortcuts import get_object_or_404
+
 from rest_framework import authentication, permissions, mixins
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSerializer, CreateUserSerializer, \
-    UpdateUserSerializer, PasswordChangeOutputSerializer
+    UpdateUserSerializer
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth import views
+
 
 
 class UserRelatedView(mixins.RetrieveModelMixin,
@@ -25,25 +25,22 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     permission_classes = [permissions.IsAdminUser]
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
+        instance = request.user
         serializer = UpdateUserSerializer(data=request.data)
-        if serializer.is_valid(raise_exception=True):
-            serializer.update(instance=instance, validated_data=serializer.validated_data)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response('Wrong input, Please provide all the required fields',
-                        status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=instance, validated_data=serializer.validated_data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
+        instance = request.user
         serializer = UpdateUserSerializer(data=request.data, partial=True)
-        if serializer.is_valid(raise_exception=True):
-            serializer.update(instance=instance, validated_data=serializer.validated_data)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response('Wrong input, Please provide all the required fields',
-                        status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        serializer.update(instance=instance, validated_data=serializer.validated_data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
+        instance = request.user
         instance.is_active = False
         instance.save()
         return Response('Object deactivated successfully', status=status.HTTP_204_NO_CONTENT)
@@ -65,12 +62,13 @@ class UserRelatedView(mixins.RetrieveModelMixin,
 
     @action(detail=False, methods=['put'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
-        instance = request.user
-        serializer = PasswordChangeSerializer(data=request.data)
+        serializer = PasswordChangeSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
+        instance = serializer.validated_data['user']
         instance.set_password(serializer.data.get('new_password'))
         instance.save()
-        return Response('password changed successfully', status=status.HTTP_200_OK)
+
+        return Response('Password changed successfully')
 
     # url_path for customizing all the methods
     @action(detail=False, methods=['get', 'put', 'patch', 'delete'], permission_classes=[permissions.IsAuthenticated])

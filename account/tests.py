@@ -118,13 +118,13 @@ class UserTests(APITestCase):
     ---- login test cases ----
     """
 
-    # def test_login(self):
-    #     login_data = {'email': 'user1@test.com',
-    #                   'password': 'abcd_1234'}
-    #
-    #     response = self.client.post(self.login_url, login_data, format='json')
-    #
-    #     self.assertEqual(response.status_code, status.HTTP_200_OK)
+    def test_login(self):
+        login_data = {'email': 'user1@test.com',
+                      'password': 'abcd_1234'}
+
+        response = self.client.post(self.login_url, login_data, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_login_with_wrong_credentials(self):
         login_data = {'email': 'user@test.com',
@@ -144,3 +144,5 @@ class UserTests(APITestCase):
 
         response = self.client.put(self.change_password_url, data)
         self.assertEqual(response.status_code, 200)
+
+

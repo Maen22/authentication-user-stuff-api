@@ -80,8 +80,7 @@ class PasswordChangeSerializer(serializers.Serializer):
         if not new_password == confirm_password:
             raise serializers.ValidationError(_("Passwords doesn't match"))
 
+        attrs['user'] = user
+
         return attrs
 
-
-class PasswordChangeOutputSerializer:
-    pass

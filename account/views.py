@@ -9,6 +9,8 @@ from .models import User
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import EmailMessage
+from rest_framework.views import APIView
 
 
 class UserRelatedView(mixins.RetrieveModelMixin,
@@ -49,8 +51,31 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     def create_user(self, request):
         serializer = CreateUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.create(validated_data=serializer.validated_data)
+        user = serializer.create(validated_data=serializer.validated_data)
+        token = default_token_generator.make_token(user)
+        mail_subject = 'Activate your blog account.'
+
+        message = 'link: ' + 'http://127.0.0.1:8000/activate/{}/{}'.format(user.id, token)
+        to_email = serializer.data['email']
+        email = EmailMessage(
+            mail_subject, message, to=[to_email]
+        )
+        email.send()
+        serializer.data['detail'] = "Please confirm your email address to complete the registration"
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    # @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny])
+    # def activate(self, request, pk, token):
+    #     try:
+    #         user = User.objects.get(pk=pk)
+    #     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+    #         user = None
+    #     if user is not None and default_token_generator.check_token(user, token):
+    #         user.is_active = True
+    #         user.save()
+    #         return Response('Thank you for your email confirmation. Now you can login your account.')
+    #     else:
+    #         return Response('Activation link is invalid!')
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
@@ -96,3 +121,19 @@ class UserRelatedView(mixins.RetrieveModelMixin,
             user.is_active = False
             user.save()
             return Response("User is deactivated", status=status.HTTP_204_NO_CONTENT)
+
+
+class ActivateUserView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk, token):
+        try:
+            user = User.objects.get(pk=pk)
+        except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        if user is not None and default_token_generator.check_token(user, token):
+            user.is_active = True
+            user.save()
+            return Response('Thank you for your email confirmation. Now you can login your account.')
+        else:
+            return Response('Activation link is invalid!')

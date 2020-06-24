@@ -486,6 +486,7 @@ class UserTests(APITestCase):
         response = self.client.get(self.admin_detail_url)
 
         content = response.json()
+        print(content)
 
         keys = ["id", "email", "first_name", "last_name", "gender"]
         for key in keys:

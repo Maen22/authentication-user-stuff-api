@@ -13,9 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        exclude = ['password']
+    class Meta(UserSerializer.Meta):
+        fields = ['id', 'email', 'first_name', 'last_name', 'gender']
 
 
 class CreateUserSerializer(UserSerializer):
@@ -33,11 +32,7 @@ class CreateUserSerializer(UserSerializer):
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
 
-        try:
-            password_validation.validate_password(password=password)
-
-        except exceptions.ValidationError as e:
-            raise e
+        password_validation.validate_password(password=password)
 
         if password != confirm_password:
             raise serializers.ValidationError(_("Passwords doesn't match, Try again"))
@@ -83,11 +78,7 @@ class PasswordChangeSerializer(serializers.Serializer):
         if not user.check_password(old_password):
             raise serializers.ValidationError(_("Old password doesn't match"))
 
-        try:
-            password_validation.validate_password(password=new_password, user=user)
-
-        except exceptions.ValidationError as e:
-            raise e
+        password_validation.validate_password(password=new_password, user=user)
 
         if not new_password == confirm_password:
             raise serializers.ValidationError(_("Passwords doesn't match"))
@@ -95,4 +86,3 @@ class PasswordChangeSerializer(serializers.Serializer):
         attrs['user'] = user
 
         return attrs
-

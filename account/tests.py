@@ -25,7 +25,7 @@ class UserTests(APITestCase):
                            'last_name': 'ladmin',
                            'gender': 'M',
                            'password': 'abcd_1234',
-                           'image': None}
+                           'image': 'asdasd'}
 
         self.user = User.objects.create_user(email='user1@test.com', first_name='fuser', last_name='luser', gender='M',
                                              password='abcd_1234')
@@ -38,6 +38,8 @@ class UserTests(APITestCase):
         self.login_url = reverse('api-login')
         self.change_password_url = reverse('api-change-password')
         self.me_url = reverse('api-me')
+        self.admin_list_url = reverse('api-list')
+        self.admin_detail_url = reverse('api-detail', args=(1,))
 
         """
         ---- create_user test cases ----
@@ -94,7 +96,8 @@ class UserTests(APITestCase):
 
         self.assertRaises(exceptions.ValidationError)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(content['non_field_errors'][0], "This password is too short. It must contain at least 8 characters.")
+        self.assertEqual(content['non_field_errors'][0],
+                         "This password is too short. It must contain at least 8 characters.")
         self.assertEqual(content['non_field_errors'][1], "This password is too common.")
         self.assertEqual(content['non_field_errors'][2], "This password is entirely numeric.")
 
@@ -210,12 +213,48 @@ class UserTests(APITestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(content['detail'], "Authentication credentials were not provided.")
 
+    def test_change_password_with_weak_password(self):
+        data = {'old_password': 'abcd_1234', 'new_password': '123456', 'confirm_password': '123456'}
+        self.client.force_login(self.user)
+
+        response = self.client.put(self.change_password_url, data)
+        content = json.loads(response.content)
+
+        self.assertRaises(exceptions.ValidationError)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(content['non_field_errors'][0],
+                         "This password is too short. It must contain at least 8 characters.")
+        self.assertEqual(content['non_field_errors'][1], "This password is too common.")
+        self.assertEqual(content['non_field_errors'][2], "This password is entirely numeric.")
+
+    def test_change_password_with_unmatch_new_passwords(self):
+        data = {'old_password': 'abcd_1234', 'new_password': 'abcd_12345', 'confirm_password': '123456'}
+        self.client.force_login(self.user)
+
+        response = self.client.put(self.change_password_url, data)
+        content = json.loads(response.content)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(content['non_field_errors'][0],
+                         "Passwords doesn't match")
+
+    def test_change_password_with_unmatch_old_passwords(self):
+        data = {'old_password': 'abcd_12345', 'new_password': 'abcd_12345', 'confirm_password': 'abcd_12345'}
+        self.client.force_login(self.user)
+
+        response = self.client.put(self.change_password_url, data)
+        content = json.loads(response.content)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(content['non_field_errors'][0],
+                         "Old password doesn't match")
+
     """
-    ---- users/me test cases ----
+    ---- users/me/ test cases ----
     """
 
     """
-    ---- 1- users/me (GET) ----
+        ---- 1- users/me/ (GET) ----
     """
 
     def test_get_user_detail(self):
@@ -251,7 +290,7 @@ class UserTests(APITestCase):
             assert value == content[k]
 
     """
-    ---- 2- users/me (PUT) ----
+        ---- 2- users/me/ (PUT) ----
     """
 
     def test_update_user_details(self):
@@ -333,9 +372,25 @@ class UserTests(APITestCase):
 
         # Using ('PUT') means changing every single field
 
+    def test_update_email_with_already_existed_email(self):
+        data = {'email': 'admin1@test.com',
+               'first_name': 'maen',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.user)
+
+        response = self.client.put(self.me_url, data=data)
+
+        content = json.loads(response.content)
+        print(content)
+
+        self.assertEqual(content['email'][0], "user with this email already exists.")
+        self.assertEqual(response.status_code, 400)
 
     """
-    ---- 3- users/me (PATCH) ----
+        ---- 3- users/me/ (PATCH) ----
     """
 
     def test_partial_update_user_details(self):
@@ -371,20 +426,312 @@ class UserTests(APITestCase):
         self.user.refresh_from_db()
         self.assertNotEqual(self.user.check_password(data['password']), True)
 
-        """
-        ---- 4- users/me (DELETE) ----
-        """
+    """
+        ---- 4- users/me/ (DELETE) ----
+    """
 
     def test_delete_user(self):
         self.client.force_login(self.user)
 
         response1 = self.client.delete(self.me_url)
-
-        # self.assertEqual(content1['detail'], "User deactivated")
-
         self.assertEqual(response1.status_code, 204)
 
         self.user.refresh_from_db()
 
+        self.assertEqual(self.user.is_active, False)
+
         response2 = self.client.delete(self.me_url)
         self.assertEqual(response2.status_code, 403)
+
+    """
+    ---- users/ test cases for the admins ----
+    """
+
+    """
+        ---- 1- users/ (GET) (list) ----
+    """
+
+    def test_list_all_users(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(self.admin_list_url)
+
+        content = response.json()
+
+        keys = ["id", "email", "first_name", "last_name", "gender"]  # ////// use zip() func
+        for x in range(User.objects.count()):
+            for key in keys:
+                value = getattr(User.objects.get(id=x + 1), key)
+                assert value == content[x][key]
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_all_users_by_normal_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.admin_list_url)
+
+        content = response.json()
+
+        self.assertEqual(content['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(response.status_code, 403)
+
+    """
+        ---- 2- users/{id} (GET) (detail) ----
+    """
+
+    def test_get_user_detail(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(self.admin_detail_url)
+
+        content = response.json()
+
+        keys = ["id", "email", "first_name", "last_name", "gender"]
+        for key in keys:
+            value = getattr(User.objects.get(id=1), key)
+            assert value == content[key]
+        print(content)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_user_detail_by_normal_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(self.admin_detail_url)
+
+        content = response.json()
+
+        self.assertEqual(content['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_user_detail_for_unknown_user(self):
+        self.client.force_login(self.admin)
+        self.admin_detail_url = reverse('api-detail', args=(3,))
+
+        response = self.client.get(self.admin_detail_url)
+        content = response.json()
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(content['detail'], "Not found.")
+
+    """
+        ---- 3- users/{id} (PUT) (detail) ----
+    """
+
+    def test_update_user_details_by_admin(self):
+        data = {'email': 'user12345@test.com',
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.admin)
+        response = self.client.put(self.admin_detail_url, data=data)
+
+        self.user.refresh_from_db()
+
+        content = json.loads(response.content)
+        keys = ["email", "first_name", "last_name", "gender"]
+        for k in keys:
+            value = getattr(self.user, k)
+            assert value == content[k]
+        self.assertEqual(response.status_code, 200)
+
+    def test_update_user_details_by_normal_user(self):
+        data = {'email': 'user12345@test.com',
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.user)
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = response.json()
+
+        self.assertEqual(content['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_update_unknown_user_detail_by_admin(self):
+        self.client.force_login(self.admin)
+        self.admin_detail_url = reverse('api-detail', args=(3,))
+
+        response = self.client.put(self.admin_detail_url)
+        content = response.json()
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(content['detail'], "Not found.")
+
+    def test_update_user_details_by_admin_null_or_blank_or_invalid_email(self):
+        # null email
+        data = {'email': None,
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.admin)
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        self.assertEqual(content['email'][0], "This field may not be null.")
+        self.assertRaises(exceptions.ValidationError)
+
+        # blank email
+        data['email'] = ''
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        # invalid email
+        data['email'] = 'maensda'
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        self.assertEqual(content['email'][0], "Enter a valid email address.")
+
+    def test_update_user_details_by_admin_missing_field(self):
+        data = {'email': 'maen@test.com',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.admin)
+
+        response = self.client.put(self.admin_detail_url, data=data)
+
+        content = json.loads(response.content)
+
+        self.assertEqual(content['first_name'][0], "This field is required.")
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_user_details_by_admin_with_password(self):
+        data = {'email': "user123@test.com",
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'password': 'maen_12345',
+                'image': None}
+
+        self.client.force_login(self.admin)
+        response = self.client.put(self.admin_detail_url, data=data)
+
+        self.user.refresh_from_db()
+
+        # The password should not be affected by ('PUT', or 'PATCH')
+        self.assertNotEqual(self.user.check_password(data['password']), True)
+
+    """
+        ---- 4- users/{id} (PATCH) (detail) ----
+    """
+
+    def test_partial_update_user_details_by_admin(self):
+        data = {'email': 'user12345@test.com',
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M'}
+
+        self.client.force_login(self.admin)
+        response = self.client.patch(self.admin_detail_url, data=data)
+
+        User.objects.get(id=1).refresh_from_db()
+
+        content = json.loads(response.content)
+        print(content)
+        keys = ["email", "first_name", "last_name", "gender"]
+        for k in keys:
+            value = getattr(User.objects.get(id=1), k)
+            assert value == content[k]
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_partial_update_user_details_by_admin_with_password(self):
+        data = {'email': "user123@test.com",
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'password': 'maen_12345',
+                'image': None}
+
+        self.client.force_login(self.admin)
+        response = self.client.put(self.admin_detail_url, data=data)
+
+        self.user.refresh_from_db()
+
+        # The password should not be affected by ('PUT', or 'PATCH')
+        self.assertNotEqual(self.user.check_password(data['password']), True)
+
+    def test_partial_update_user_details_by_normal_user(self):
+        data = {'email': 'user12345@test.com',
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M'}
+
+        self.client.force_login(self.user)
+
+        response = self.client.patch(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+        print(content)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(content['detail'], "You do not have permission to perform this action.")
+
+    def test_partial_update_user_details_null_or_blank_or_invalid_email(self):
+        # null email
+        data = {'email': None,
+                'first_name': 'updated fname',
+                'last_name': 'updated lname',
+                'gender': 'M',
+                'image': None}
+
+        self.client.force_login(self.admin)
+        response = self.client.patch(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        self.assertEqual(content['email'][0], "This field may not be null.")
+        self.assertRaises(exceptions.ValidationError)
+
+        # blank email
+        data['email'] = ''
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        # invalid email
+        data['email'] = 'maensda'
+        response = self.client.put(self.admin_detail_url, data=data)
+        content = json.loads(response.content)
+
+        self.assertEqual(content['email'][0], "Enter a valid email address.")
+
+    """
+        ---- 5- users/{id} (DELETE) (detail) ----
+    """
+
+    def test_delete_user_by_admin(self):
+        self.client.force_login(self.admin)
+
+        response1 = self.client.delete(self.admin_detail_url)
+        self.assertEqual(response1.status_code, 204)
+
+        self.user.refresh_from_db()
+
+        self.assertEqual(self.user.is_active, False)
+
+        response2 = self.client.delete(self.admin_detail_url)
+        # self.assertEqual(response2.status_code, 403)
+
+        print(response2.status_code)
+
+    def test_delete_user_by_normal_user(self):
+        self.client.force_login(self.user)
+
+        response = self.client.delete(self.admin_detail_url)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(self.user.is_active, True)
+
+    def test_delete_unknown_user_by_admin(self):
+        self.client.force_login(self.admin)
+        admin_detail_url = reverse('api-detail', args=(3,))
+
+        response = self.client.delete(admin_detail_url)
+        content = response.json()
+
+        self.assertEqual(response.status_code, 404)

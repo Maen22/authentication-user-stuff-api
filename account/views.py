@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import authentication, permissions, mixins
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import action
@@ -22,25 +23,26 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
+    lookup_field = 'pk'
 
-    def update(self, request, *args, **kwargs):
-        instance = request.user
-        serializer = UpdateUserSerializer(data=request.data)
+    def update(self, request, pk=None):
+        user = get_object_or_404(self.queryset, pk=pk)
+        serializer = UpdateUserSerializer(data=request.data, partial=False)
         serializer.is_valid(raise_exception=True)
-        serializer.update(instance=instance, validated_data=serializer.validated_data)
+        serializer.update(instance=user, validated_data=serializer.data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def partial_update(self, request, *args, **kwargs):
-        instance = request.user
+    def partial_update(self, request, pk=None):
+        user = get_object_or_404(self.queryset, pk=pk)
         serializer = UpdateUserSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.update(instance=instance, validated_data=serializer.validated_data)
+        serializer.update(instance=user, validated_data=serializer.validated_data)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = request.user
-        instance.is_active = False
-        instance.save()
+    def destroy(self, request, pk=None):
+        user = get_object_or_404(self.queryset, pk=pk)
+        user.is_active = False
+        user.save()
         return Response('Object deactivated successfully', status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
@@ -93,8 +95,4 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         if request.method == 'DELETE':
             user.is_active = False
             user.save()
-            res = {
-                'detail': 'User deactivated'
-            }
-            # response = json.dumps(res)
-            return Response(res, status=status.HTTP_204_NO_CONTENT)
+            return Response("User is deactivated", status=status.HTTP_204_NO_CONTENT)

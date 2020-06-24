@@ -17,6 +17,7 @@ class MyAccountManager(BaseUserManager):
             image=image,
         )
         user.set_password(password)
+        user.is_active = False
         user.save()
         return user
 

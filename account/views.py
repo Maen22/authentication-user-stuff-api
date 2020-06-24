@@ -8,7 +8,7 @@ from .serializers import UserSerializer, AuthTokenSerializer, PasswordChangeSeri
 from .models import User
 from rest_framework.response import Response
 from rest_framework import status
-import json
+from django.contrib.auth.tokens import default_token_generator
 
 
 class UserRelatedView(mixins.RetrieveModelMixin,

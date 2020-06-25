@@ -379,7 +379,7 @@ class UserTests(APITestCase):
 
     def test_update_email_with_already_existed_email(self):
         data = {'email': 'admin1@test.com',
-               'first_name': 'maen',
+                'first_name': 'maen',
                 'last_name': 'updated lname',
                 'gender': 'M',
                 'image': None}
@@ -742,9 +742,13 @@ class UserTests(APITestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    """
+    ---- activate/ test cases for the email activation ----
+    """
+
     def test_email_sending(self):
         user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
-                                             password='abcd_1234')
+                                        password='abcd_1234')
 
         token = default_token_generator.make_token(user)
         mail_subject = 'Activate your account.'
@@ -764,3 +768,49 @@ class UserTests(APITestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(user.is_active, True)
         self.assertEqual(content, "Thank you for your email confirmation. Now you can login your account.")
+
+    def test_email_sending_with_invalid_token(self):
+        user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
+                                        password='abcd_1234')
+
+        token = default_token_generator.make_token(user)
+        mail_subject = 'Activate your account.'
+        message = 'http://127.0.0.1:8000/activate/{}/{}/'.format(user.id, token + "asdasd")  # invalid token
+        to_email = user.email
+        mail.send_mail(
+            mail_subject, message,
+            settings.EMAIL_HOST_USER, [to_email]
+        )
+
+        self.assertEqual(user.is_active, False)
+
+        response = self.client.get(str(mail.outbox[0].body))
+        content = response.json()
+        user.refresh_from_db()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(user.is_active, False)
+        self.assertEqual(content, "Activation link is invalid!")
+
+    def test_email_sending_with_invalid_id(self):
+        user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
+                                        password='abcd_1234')
+
+        token = default_token_generator.make_token(user)
+        mail_subject = 'Activate your account.'
+        message = 'http://127.0.0.1:8000/activate/{}/{}/'.format(10, token)  # invalid token
+        to_email = user.email
+        mail.send_mail(
+            mail_subject, message,
+            settings.EMAIL_HOST_USER, [to_email]
+        )
+
+        self.assertEqual(user.is_active, False)
+
+        response = self.client.get(str(mail.outbox[0].body))
+        content = response.json()
+        user.refresh_from_db()
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(user.is_active, False)
+        self.assertEqual(content['detail'], "Not found.")

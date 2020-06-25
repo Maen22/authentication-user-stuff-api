@@ -131,7 +131,7 @@ class ActivateUserView(APIView):
         user = get_object_or_404(User, id=pk)
 
         if user.is_active:
-            return Response('already activated')
+            return Response('already activated', status=status.HTTP_208_ALREADY_REPORTED)
 
         
         if user is not None and default_token_generator.check_token(user, token):
@@ -139,4 +139,4 @@ class ActivateUserView(APIView):
             user.save()
             return Response('Thank you for your email confirmation. Now you can login your account.', status=status.HTTP_202_ACCEPTED)
         else:
-            return Response('Activation link is invalid!')
+            return Response('Activation link is invalid!', status=status.HTTP_400_BAD_REQUEST)

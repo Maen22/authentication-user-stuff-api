@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model, authenticate, password_validatio
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework import exceptions
+from validate_email import validate_email
 from .models import User
 
 
@@ -31,6 +32,9 @@ class CreateUserSerializer(UserSerializer):
     def validate(self, attrs):
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
+        email = attrs.get('email')
+
+        validate_email(email, verify=True)
 
         password_validation.validate_password(password=password)
 

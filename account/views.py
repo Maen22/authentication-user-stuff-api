@@ -53,7 +53,7 @@ class UserRelatedView(mixins.RetrieveModelMixin,
         serializer.is_valid(raise_exception=True)
         user = serializer.create(validated_data=serializer.validated_data)
         token = default_token_generator.make_token(user)
-        mail_subject = 'Activate your blog account.'
+        mail_subject = 'Activate your account.'
 
         message = 'link: ' + 'http://127.0.0.1:8000/activate/{}/{}'.format(user.id, token)
         to_email = serializer.data['email']
@@ -127,13 +127,16 @@ class ActivateUserView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, pk, token):
-        try:
-            user = User.objects.get(pk=pk)
-        except(TypeError, ValueError, OverflowError, User.DoesNotExist):
-            user = None
+        
+        user = get_object_or_404(User, id=pk)
+
+        if user.is_active:
+            return Response('already activated')
+
+        
         if user is not None and default_token_generator.check_token(user, token):
             user.is_active = True
             user.save()
-            return Response('Thank you for your email confirmation. Now you can login your account.')
+            return Response('Thank you for your email confirmation. Now you can login your account.', status=status.HTTP_202_ACCEPTED)
         else:
             return Response('Activation link is invalid!')

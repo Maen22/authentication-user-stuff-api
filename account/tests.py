@@ -1,9 +1,13 @@
+from django.contrib.auth.tokens import default_token_generator
 from django.urls import reverse
 from rest_framework import status, exceptions
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
+
+from Task1 import settings
 from .models import User
 import json
+from django.core import mail
 
 
 class UserTests(APITestCase):
@@ -40,6 +44,7 @@ class UserTests(APITestCase):
         self.me_url = reverse('api-me')
         self.admin_list_url = reverse('api-list')
         self.admin_detail_url = reverse('api-detail', args=(1,))
+        self.email_activation_url = 'http://127.0.0.1:8000/activate/{}/{}'
 
         """
         ---- create_user test cases ----
@@ -736,3 +741,26 @@ class UserTests(APITestCase):
         content = response.json()
 
         self.assertEqual(response.status_code, 404)
+
+    def test_email_sending(self):
+        user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
+                                             password='abcd_1234')
+
+        token = default_token_generator.make_token(user)
+        mail_subject = 'Activate your account.'
+        message = 'http://127.0.0.1:8000/activate/{}/{}/'.format(user.id, token)
+        to_email = user.email
+        mail.send_mail(
+            mail_subject, message,
+            settings.EMAIL_HOST_USER, [to_email]
+        )
+
+        self.assertEqual(user.is_active, False)
+
+        response = self.client.get(str(mail.outbox[0].body))
+        content = response.json()
+        user.refresh_from_db()
+
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(user.is_active, True)
+        self.assertEqual(content, "Thank you for your email confirmation. Now you can login your account.")

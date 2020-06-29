@@ -7,7 +7,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('docs/', include_docs_urls('rest_framework.docs')),
     path('home/', views.index, name='index'),
-    path('special/', views.special, name='special'),
     path('logout/', views.user_logout, name='logout'),
     path('', include('account.urls')),
 

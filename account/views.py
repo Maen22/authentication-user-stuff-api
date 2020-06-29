@@ -9,6 +9,8 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.tokens import default_token_generator
 
+from .models import User
+
 
 def index(request):
     return render(request, 'account/index.html')
@@ -26,29 +28,30 @@ def register(request):
         user_form = UserCreateForm(data=request.POST)
         # profile_form = UserProfileForm(data=request.POST)
         if user_form.is_valid():
-            user = user_form.save()
-            user.set_password(user.password)
-            user.is_active = False
-            user.save()
+            user_form.cleaned_data['password'] = user_form.cleaned_data.pop('password1')
+            user_form.cleaned_data.pop('password2')
+            user = User.objects.create_user(**user_form.cleaned_data)
             current_site = get_current_site(request)
             subject = 'Please Activate Your Account'
-            # load a template like get_template() 
-            # and calls its render() method immediately.
-            message = render_to_string('activation_request.html', {
+
+            # makes an html a string to send it through the email!!!
+            message = render_to_string('account/activation_request.html', {
                 'user': user,
                 'domain': current_site.domain,
-                'pk': user.pk,
-                # method will generate a hash value with user related data
+                'uid': user.pk,
                 'token': default_token_generator.make_token(user),
             })
             user.email_user(subject, message)
-            return redirect('activation_sent')
+            return redirect('account:activation_sent')
     else:
         user_form = UserCreateForm()
-        # profile_form = UserProfileForm()
-    return render(request, 'account/registration.html',
-                  {'user_form': user_form,
-                   'registered': registered})
+        return render(request, 'account/registration.html',
+                      {'user_form': user_form,
+                       'registered': registered})
+
+
+def activation_sent_view(request):
+    return render(request, 'account/activation_sent.html')
 
 
 def user_login(request):

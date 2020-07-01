@@ -4,33 +4,28 @@ from .models import User
 from django.utils.translation import gettext as _
 
 
-class UserAdmin(BaseUserAdmin):
-    ordering = ['id']
-    list_display = ['email', 'first_name', 'last_name', 'gender']
+class CustomUserAdmin(BaseUserAdmin):
+    ordering = ('id',)
+    search_fields = ('first_name', 'last_name', 'email')
+    model = User
+    list_display = ['email', 'first_name', 'last_name', 'gender', 'organization']
+    list_filter = ('is_admin',)
 
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        (_('Personal Info'), {'fields': ('first_name', 'last_name', 'gender', 'image',)}),
-        (
-            _('Permissions'),
-            {
-                'fields': (
-                    'is_active',
-                    'is_staff',
-                    'is_superuser',
-                )
-            }
-        ),
-        (_('Important dates'), {'fields': ('last_login',)}),
+        (_('Personal info'), {'fields': ('first_name', 'last_name', 'gender', 'image', 'organization')}),
+        (_('Permissions'), {
+            'fields': ('is_admin',),
+        }),
+        (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
-
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'password1', 'password2')
+            'fields': ('email', 'password1', 'password2'),
         }),
     )
 
 
-admin.site.register(User, UserAdmin)
+admin.site.register(User, CustomUserAdmin)
 

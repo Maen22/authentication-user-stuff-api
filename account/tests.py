@@ -3,7 +3,6 @@ from django.urls import reverse
 from rest_framework import status, exceptions
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
-
 from Task1 import settings
 from .models import User
 import json
@@ -389,7 +388,6 @@ class UserTests(APITestCase):
         response = self.client.put(self.me_url, data=data)
 
         content = json.loads(response.content)
-        print(content)
 
         self.assertEqual(content['email'][0], "user with this email already exists.")
         self.assertEqual(response.status_code, 400)
@@ -491,13 +489,10 @@ class UserTests(APITestCase):
         response = self.client.get(self.admin_detail_url)
 
         content = response.json()
-        print(content)
-
         keys = ["id", "email", "first_name", "last_name", "gender"]
         for key in keys:
             value = getattr(User.objects.get(id=1), key)
             assert value == content[key]
-        print(content)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_get_user_detail_by_normal_user(self):
@@ -641,7 +636,7 @@ class UserTests(APITestCase):
         User.objects.get(id=1).refresh_from_db()
 
         content = json.loads(response.content)
-        print(content)
+
         keys = ["email", "first_name", "last_name", "gender"]
         for k in keys:
             value = getattr(User.objects.get(id=1), k)
@@ -675,7 +670,6 @@ class UserTests(APITestCase):
 
         response = self.client.patch(self.admin_detail_url, data=data)
         content = json.loads(response.content)
-        print(content)
         self.assertEqual(response.status_code, 403)
         self.assertEqual(content['detail'], "You do not have permission to perform this action.")
 
@@ -723,7 +717,6 @@ class UserTests(APITestCase):
         response2 = self.client.delete(self.admin_detail_url)
         # self.assertEqual(response2.status_code, 403)
 
-        print(response2.status_code)
 
     def test_delete_user_by_normal_user(self):
         self.client.force_login(self.user)
@@ -759,15 +752,15 @@ class UserTests(APITestCase):
             settings.EMAIL_HOST_USER, [to_email]
         )
 
-        self.assertEqual(user.is_active, False)
+        self.assertEqual(user.is_active, True)
 
         response = self.client.get(str(mail.outbox[0].body))
         content = response.json()
         user.refresh_from_db()
 
-        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.status_code, 208)
         self.assertEqual(user.is_active, True)
-        self.assertEqual(content, "Thank you for your email confirmation. Now you can login your account.")
+        self.assertEqual(content, "already activated")
 
     def test_email_sending_with_invalid_token(self):
         user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
@@ -782,15 +775,16 @@ class UserTests(APITestCase):
             settings.EMAIL_HOST_USER, [to_email]
         )
 
-        self.assertEqual(user.is_active, False)
+        self.assertEqual(user.is_active, True)
 
         response = self.client.get(str(mail.outbox[0].body))
         content = response.json()
         user.refresh_from_db()
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(user.is_active, False)
-        self.assertEqual(content, "Activation link is invalid!")
+        self.assertEqual(response.status_code, 208)
+
+        self.assertEqual(user.is_active, True)
+        self.assertEqual(content, "already activated")
 
     def test_email_sending_with_invalid_id(self):
         user = User.objects.create_user(email='testuser@test.com', first_name='fuser', last_name='luser', gender='M',
@@ -805,12 +799,12 @@ class UserTests(APITestCase):
             settings.EMAIL_HOST_USER, [to_email]
         )
 
-        self.assertEqual(user.is_active, False)
+        self.assertEqual(user.is_active, True)
 
         response = self.client.get(str(mail.outbox[0].body))
         content = response.json()
         user.refresh_from_db()
 
         self.assertEqual(response.status_code, 404)
-        self.assertEqual(user.is_active, False)
+        self.assertEqual(user.is_active, True)
         self.assertEqual(content['detail'], "Not found.")

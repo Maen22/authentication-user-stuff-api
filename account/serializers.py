@@ -22,7 +22,7 @@ class CreateUserSerializer(UserSerializer):
     confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True, write_only=True)
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['confirm_password']
+        fields = UserSerializer.Meta.fields + ['confirm_password', 'organization']
 
     def create(self, validated_data):
         validated_data.pop('confirm_password', None)
@@ -30,6 +30,7 @@ class CreateUserSerializer(UserSerializer):
         return User.objects.create_user(**validated_data)
 
     def validate(self, attrs):
+        organization = attrs.get('organization')
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
         email = attrs.get('email')

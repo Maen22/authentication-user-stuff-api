@@ -1,13 +1,13 @@
-from django.db import models
 from django.contrib.auth.models import BaseUserManager, \
     PermissionsMixin, AbstractUser
-from django.utils.translation import gettext_lazy as _
+from django.db import models
+
 from organization.models import Organization
 
 
 class MyAccountManager(BaseUserManager):
 
-    def create_user(self, email, first_name, last_name, gender, organization, image=None, password=None,):
+    def create_user(self, email, first_name, last_name, gender, organization=None, image=None, password=None, ):
         # Creates and save a new user
 
         if not email:
@@ -22,11 +22,11 @@ class MyAccountManager(BaseUserManager):
             organization=Organization.objects.get(name=organization)
         )
         user.set_password(password)
-        user.is_active = False
-        user.save(using=self._db)
+        user.is_active = True
+        user.save()
         return user
 
-    def create_superuser(self, email, first_name, last_name, gender, organization, image=None, password=None):
+    def create_superuser(self, email, first_name, last_name, gender, organization=None, image=None, password=None):
         # Creates and save a new superUser
 
         user = self.create_user(
@@ -39,7 +39,7 @@ class MyAccountManager(BaseUserManager):
             password=password
         )
         user.is_admin = True
-        user.save(using=self._db)
+        user.save()
         return user
 
 
@@ -55,7 +55,8 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=50, null=False)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, null=False)
     image = models.ImageField(upload_to='uploads/', null=True)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='users', default='No Org', db_constraint=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name='users', default='No Org',
+                                     db_constraint=False, null=True)
     is_admin = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'

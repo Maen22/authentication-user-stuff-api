@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'organization',
 ]
 
-
 OLD_PASSWORD_FIELD_ENABLED = True
 
 REST_FRAMEWORK = {
@@ -67,7 +66,10 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.MultiPartRenderer',
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.TemplateHTMLRenderer'
-    ]
+    ],
+
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 5
 }
 
 MIDDLEWARE = [

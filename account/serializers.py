@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model, authenticate, password_validation
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers
 from rest_framework import exceptions
+from rest_framework import serializers
 from validate_email import validate_email
+
+from organization.models import Organization
 from .models import User
 
 
@@ -22,15 +24,17 @@ class CreateUserSerializer(UserSerializer):
     confirm_password = serializers.CharField(max_length=128, allow_blank=False, required=True, write_only=True)
 
     class Meta(UserSerializer.Meta):
-        fields = UserSerializer.Meta.fields + ['confirm_password', 'organization']
+        fields = ['email', 'password', 'first_name', 'last_name', 'gender', 'image', 'confirm_password']
 
     def create(self, validated_data):
         validated_data.pop('confirm_password', None)
-        # self.data.pop('confirm_password')
-        return User.objects.create_user(**validated_data)
+        organization_name = validated_data.pop('organization_name')
+
+        org = Organization.objects.get(name=organization_name)
+
+        return User.objects.create_user(**validated_data, organization=org)
 
     def validate(self, attrs):
-        organization = attrs.get('organization')
         password = attrs.get('password')
         confirm_password = attrs.get('confirm_password')
         email = attrs.get('email')

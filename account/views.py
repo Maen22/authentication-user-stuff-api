@@ -51,7 +51,9 @@ class UserRelatedView(mixins.RetrieveModelMixin,
     def create_user(self, request):
         serializer = CreateUserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.create(validated_data=serializer.validated_data)
+        user = serializer.create(validated_data=request.data)
+        user.save()
+        # user = serializer.create(validated_data=serializer.validated_data)
         token = default_token_generator.make_token(user)
         mail_subject = 'Activate your account.'
 
